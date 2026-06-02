@@ -4,12 +4,16 @@ dbt is installed in an isolated `uv` virtual environment scoped to this folder.
 This avoids conflicts with other Python tools in the project.
 
 
-### Using the starter project from scratch
+## Initialize a new project from scratch
 
-- dbt init project-name
-
+```bash
+dbt init project-name
+```
 
 ### Resources:
-- Learn more about dbt [in the docs](https://docs.getdbt.com/docs/introduction)
-- Check out [Discourse](https://discourse.getdbt.com/) for commonly asked questions and answers
-- Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
+
+To learn and stay up to date with dbt:
+
+- Start with the official [dbt Documentation](https://docs.getdbt.com/docs/introduction)
+- For common questions and community answers, see [dbt Discourse](https://discourse.getdbt.com/)
+- For the latest news, best practices, and development updates, read the [dbt Blog](https://blog.getdbt.com/)
