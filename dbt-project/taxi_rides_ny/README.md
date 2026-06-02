@@ -1,15 +1,10 @@
-Welcome to your new dbt project!
+## Project Structure
 
-### Using the starter project
-
-Try running the following commands:
-- dbt run
-- dbt test
-
-
-### Resources:
-- Learn more about dbt [in the docs](https://docs.getdbt.com/docs/introduction)
-- Check out [Discourse](https://discourse.getdbt.com/) for commonly asked questions and answers
-- Join the [chat](https://community.getdbt.com/) on Slack for live discussions and support
-- Find [dbt events](https://events.getdbt.com) near you
-- Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
+models/
+├── staging/       # Clean raw BigQuery tables (views)
+├── intermediate/  # Union yellow + green taxi (views)
+└── marts/         # Star schema — dimensions + fact + aggregations (tables)
+seeds/             # Static lookup tables (taxi zones, payment types)
+macros/            # Reusable SQL functions
+analyses/          # Ad-hoc queries — compile with dbt compile, run in BigQuery
+tests/             # Singular data quality tests
