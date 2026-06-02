@@ -1,16 +1,23 @@
 ## Environment
 
-dbt is installed in an isolated `uv` virtual environment scoped to this folder.
-This avoids conflicts with other Python tools in the project.
+dbt is installed in an isolated `uv` virtual environment scoped to this folder, avoiding conflicts with other Python tools in the project.
 
+### Create a dbt project with `uv`
 
-## Initialize a new project from scratch
+```bash
+uv init --python=3.11
+uv venv --python 3.11
+uv add "dbt-core==1.8.1" "dbt-bigquery==1.8.1"
+uv pip install .
+```
+
+### Initialize a new dbt project from scratch
 
 ```bash
 dbt init project-name
 ```
 
-### Resources:
+### Resources
 
 To learn and stay up to date with dbt:
 
