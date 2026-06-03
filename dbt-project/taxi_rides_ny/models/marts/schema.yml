@@ -1,0 +1,163 @@
+version: 2
+
+models:
+  - name: dim_vendor
+    description: "Taxi technology vendor dimension table."
+    columns:
+      - name: vendor_id
+        description: "The primary key for each vendor."
+        data_tests:
+          - unique
+          - not_null
+      - name: vendor_name
+        description: "The name of the vendor."
+        data_tests:
+          - not_null
+
+  - name: dim_zones
+    description: "Taxi zones dimension table."
+    columns:
+      - name: location_id
+        description: "The primary key for each location."
+        data_tests:
+          - unique
+          - not_null
+      - name: borough
+        description: "The borough where the location is situated."
+        data_tests:
+          - not_null
+      - name: zone
+        description: "The specific zone within the borough."
+        data_tests:
+          - not_null
+      - name: service_zone
+        description: "The service zone classification for the location."
+        data_tests:
+          - not_null
+
+  - name: dim_payment_type
+    description: "Payment type dimension table."
+    columns:
+      - name: payment_type_id
+        description: "The primary key for each payment type."
+        data_tests:
+          - unique
+          - not_null
+      - name: payment_type_description
+        description: "Description of the payment type used in the taxi ride."
+        data_tests:
+          - not_null
+
+  - name: dim_rate_code
+    description: "Rate code dimension table."
+    columns:
+      - name: rate_code_id
+        description: "The primary key for each rate code."
+        data_tests:
+          - unique
+          - not_null
+      - name: rate_code_description
+        description: "Description of the rate code applied to the taxi ride."
+        data_tests:
+          - not_null
+      - name: rate_code_group
+        description: "The group classification for the rate code."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Standard', 'Airport', 'Outer zone', 'Special', 'Unknown']
+
+  - name: fact_trips
+    description: "Fact table containing details of taxi trips (yellow and green)."
+    columns:
+      - name: trip_id
+        description: "Surrogate key generated from vendor_id, pickup_datetime, dropoff_datetime, pickup_location_id and dropoff_location_id."
+        data_tests:
+          - unique
+          - not_null
+      - name: vendor_id
+        description: "Foreign key to dim_vendor."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_vendor')
+              field: vendor_id
+              severity: warn
+      - name: pickup_location_id
+        description: "Foreign key to dim_zones. TLC zone where the trip started."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_zones')
+              field: location_id
+              severity: warn
+      - name: dropoff_location_id
+        description: "Foreign key to dim_zones. TLC zone where the trip ended."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_zones')
+              field: location_id
+              severity: warn
+      - name: payment_type_id
+        description: "Foreign key to dim_payment_type. The identifier for the payment type used in the ride."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_payment_type')
+              field: payment_type_id
+              severity: warn
+      - name: rate_code_id
+        description: "Foreign key to dim_rate_code. The rate code applied to the ride."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_rate_code')
+              field: rate_code_id
+              severity: warn
+
+      - name: pickup_datetime
+        description: "The date and time when the taxi ride started."
+        data_tests:
+          - not_null
+      - name: dropoff_datetime
+        description: "The date and time when the taxi ride ended."
+        data_tests:
+          - not_null
+
+      - name: trip_distance
+        description: "The distance traveled during the taxi ride in miles."
+      - name: passenger_count
+        description: "The number of passengers in the taxi ride."
+      - name: trip_duration
+        description: "The duration of the taxi ride in minutes."
+     
+      - name: fare_amount
+        description: "The fare amount charged for the taxi ride."
+      - name: extra
+        description: "Additional charges for the taxi ride, such as tolls or fees."
+      - name: mta_tax
+        description: "The MTA tax applied to the taxi ride, if applicable."
+      - name: tip_amount
+        description: "The tip amount given for the taxi ride."
+      - name: total_amount
+        description: "The total amount charged for the taxi ride, including fare and tip."
+      - name: ehail_fee
+        description: "The e-hail fee charged for the taxi ride, if applicable."
+      - name: improvement_surcharge
+        description: "The improvement surcharge applied to the taxi ride, if applicable."
+      
+      - name: service_type
+        description: "The type of service for the taxi ride (yellow or green)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['yellow', 'green']
+      - name: trip_type
+        description: "The type of trip code (1 for street-hail, 2 for dispatch)."
+      - name: trip_type_description
+        description: "Description of the trip type based on the trip_type code."
+      - name: store_and_fwd_flag
+        description: "Indicates whether the trip record was held in vehicle memory before sending to the vendor because the connection to the server was lost (Y/N)."
+      - name: store_and_fwd_description
+        description: "Description of the store and forward flag based on the store_and_fwd_flag value."

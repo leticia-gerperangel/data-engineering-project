@@ -1,0 +1,57 @@
+
+# Name your project! Project names should contain only lowercase characters and underscores.
+# A good package name should reflect your organization's name or the intended use of these models
+name: 'taxi_rides_ny'
+version: '1.0.0'
+
+# This setting configures which "profile" dbt uses for this project.
+profile: 'taxi_rides_ny'
+
+# These configurations specify where dbt should look for different types of files.
+# The `model-paths` config, for example, states that models in this project can be found in the "models/" directory.
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+# Directories to be removed by `dbt clean`
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Define variables that can be used in your models, tests, and macros. You can override these variables when you run dbt commands.
+vars:
+  start_year: 2019
+  end_year: 2020
+
+# Configuring models
+# Full documentation: https://docs.getdbt.com/docs/configuring-models
+models:
+  taxi_rides_ny:
+    staging:
+      +materialized: view       # always view: no costs
+      +schema: staging          # dataset: taxi_rides_ny_staging
+ 
+    intermediate:
+      +materialized: view       # no need to persist intermediate models: no costs
+      +schema: intermediate     # dataset: taxi_rides_ny_intermediate
+ 
+    marts:
+      +materialized: table      # marts are the final output of our transformations: we want to persist them
+      +schema: marts            # dataset: taxi_rides_ny_marts
+ 
+seeds:
+  taxi_rides_ny:
+    +schema: seeds              # dataset: taxi_rides_ny_seeds
+    taxi_zone_lookup:
+      +column_types:
+        locationid: integer
+        borough: string
+        zone: string
+        service_zone: string
+    payment_type_lookup:
+      +column_types:
+        payment_type: integer
+        description: string

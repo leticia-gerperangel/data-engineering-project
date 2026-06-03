@@ -1,0 +1,10 @@
+[project]
+name = "dbt-project"
+version = "0.1.0"
+description = "dbt analytics engineering project for NYC Taxi trip data pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "dbt-bigquery==1.8.1",
+    "dbt-core==1.8.1",
+]

@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: int_trips_union
+    description: >
+      Union of yellow and green taxi trips with standardized column names.
+      Adds service_type to distinguish between taxi types downstream.
+      Source for fact_trips and all mart models.
+    columns:
+      - name: service_type
+        description: "Taxi service type (yellow or green)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['yellow', 'green']

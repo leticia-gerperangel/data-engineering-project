@@ -1,0 +1,87 @@
+version: 2
+
+sources:
+  - name: raw_data
+    description: "This source contains the raw data for the taxi rides in New York City."
+    database: "{{ env_var('GCP_PROJECT_ID', 'dataengineering-492009') }}" # name of your GCP project
+    schema: nytaxi # name of your BigQuery dataset
+    tables:
+      - name: external_yellow_tripdata
+        description: "Raw yellow taxi trip records."
+        columns:
+          - name: vendorid
+            description: "A code indicating the provider associated with the trip record."
+          - name: tpep_pickup_datetime
+            description: "The date and time when the meter was engaged."
+          - name: tpep_dropoff_datetime
+            description: "The date and time when the meter was disengaged."
+          - name: passenger_count
+            description: "The number of passengers in the vehicle (driver-entered value)."
+          - name: trip_distance
+            description: "The trip distance in miles reported by the taximeter."
+          - name: pulocationid
+            description: "The TLC Taxi Zone in which the taximeter was engaged."
+          - name: dolocationid
+            description: "The TLC Taxi Zone in which the taximeter was disengaged."
+          - name: ratecodeid
+            description: "The final rate code in effect at the end of the trip."
+          - name: store_and_fwd_flag
+            description: "This flag indicates whether the trip record was stored and forwarded."
+          - name: payment_type
+            description: "The final payment type in effect at the end of the trip."
+          - name: fare_amount
+            description: "The time-and-distance fare calculated by the meter."
+          - name: extra
+            description: "Miscellaneous extras and surcharges."
+          - name: mta_tax
+            description: "MTA tax that is automatically triggered based on the metered rate in use."
+          - name: tip_amount
+            description: "For credit card tips. Cash tips are not included."
+          - name: tolls_amount
+            description: "Total amount of all tolls paid in trip."
+          - name: improvement_surcharge
+            description: "Improvement surcharge assessed trips at the flag drop. The amount is $0.30."
+          - name: total_amount
+            description: "The total amount charged to passengers. Does not include cash tips."
+            
+      - name: external_green_tripdata
+        description: "Raw green taxi trip records."
+        columns:
+          - name: vendorid
+            description: "A code indicating the provider associated with the trip record."
+          - name: tpep_pickup_datetime
+            description: "The date and time when the meter was engaged."
+          - name: tpep_dropoff_datetime
+            description: "The date and time when the meter was disengaged."
+          - name: passenger_count
+            description: "The number of passengers in the vehicle (driver-entered value)."
+          - name: trip_distance
+            description: "The trip distance in miles reported by the taximeter."
+          - name: pulocationid
+            description: "The TLC Taxi Zone in which the taximeter was engaged."
+          - name: dolocationid
+            description: "The TLC Taxi Zone in which the taximeter was disengaged."
+          - name: ratecodeid
+            description: "The final rate code in effect at the end of the trip."
+          - name: store_and_fwd_flag
+            description: "This flag indicates whether the trip record was stored and forwarded."
+          - name: payment_type
+            description: "The final payment type in effect at the end of the trip."
+          - name: fare_amount
+            description: "The time-and-distance fare calculated by the meter."
+          - name: extra
+            description: "Miscellaneous extras and surcharges."
+          - name: mta_tax
+            description: "MTA tax that is automatically triggered based on the metered rate in use."
+          - name: tip_amount
+            description: "For credit card tips. Cash tips are not included."
+          - name: tolls_amount
+            description: "Total amount of all tolls paid in trip."
+          - name: improvement_surcharge
+            description: "Improvement surcharge assessed trips at the flag drop. The amount is $0.30."
+          - name: total_amount
+            description: "The total amount charged to passengers. Does not include cash tips."
+          - name: tip_type
+            description: "Tip type (1=Street-hail, 2=Dispatch)."
+          - name: ehail_fee
+            description: "The fee for e-hail trips. This is only applicable for green taxi trips."
