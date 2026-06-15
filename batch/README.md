@@ -8,3 +8,4 @@ Spark runs locally in a WSL environment with Java 17, isolated from the Windows 
 
 - Requires Java 17 and Apache Spark 4.x installed in WSL.
 - Spark output files are excluded from git via `.gitignore`.
+- To test the connection, the `test.ipynb` reads a CSV and writes Parquet locally to verify the Spark installation works correctly.
