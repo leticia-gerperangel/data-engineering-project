@@ -41,7 +41,7 @@ def load_env_vars():
         env_file = candidate / ".env_encoded"
         if env_file.exists():
             load_dotenv(env_file)
-            logger.info(f".env cargado desde: {env_file}")
+            logger.info(f".env loaded from: {env_file}")
             return
     logger.warning("Not found .env — using system environment variables")
 
@@ -182,7 +182,7 @@ def main(service, year, months, bucket, upload_csv):
         # Parse space-separated month list from command line
         month_list = [int(m) for tocken in months for m in tocken.split()]
 
-    logger.info(f"Servicio: {service} | Año: {year} | Meses: {month_list}")
+    logger.info(f"Service: {service} | Year: {year} | Months: {month_list}")
     logger.info(f"Bucket  : gs://{bucket}/{service}/")
 
     results = {"ok": [], "skip": [], "error": []}
@@ -197,17 +197,17 @@ def main(service, year, months, bucket, upload_csv):
                 else:
                     results["skip"].append(month)
             except Exception as exc:
-                logger.error(f"Error en mes {month:02d}/{year}: {exc}", exc_info=True)
+                logger.error(f"Error in month {month:02d}/{year}: {exc}", exc_info=True)
                 results["error"].append(month)
     # Summary
     logger.info("─" * 50)
-    logger.info(f"Completados : {results['ok']}")
+    logger.info(f"Completed : {results['ok']}")
     if results["skip"]:
-        logger.warning(f"No encontrados (404): {results['skip']}")
+        logger.warning(f"Not found (404): {results['skip']}")
     if results["error"]:
-        logger.error(f"Errores     : {results['error']}")
+        logger.error(f"Errors : {results['error']}")
         sys.exit(1)
-    logger.info("ETL completado.")
+    logger.info("ETL completed.")
 
 
 if __name__ == "__main__":
