@@ -1,3 +1,25 @@
+# Credentials
+credentials/
+
+# Spark output files
+batch/data/
+*.crc
+*.snappy.parquet
+_SUCCESS
+.part-*
+# PySpark notebook to ignore
+batch/notebook/pySpark_intro
+
+# dbt
+dbt-project/profiles.yml
+dbt-project/target/
+dbt-project/dbt_packages/
+dbt-project/logs/
+
+# Kestra flows with sensitive values
+orchestration/06-gcp-kv.yaml
+
+*.parquet
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -135,6 +157,9 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+.env_postgres
+.env_postgres_docker
+.env_encoded
 .env
 .envrc
 .venv

@@ -31,7 +31,6 @@ zone_metrics as (
  
     from trips t
     left join zones pz on t.pickup_location_id = pz.location_id
-    where t.pickup_location_id is not null
     group by 1, 2, 3, 4, 5
 )
  

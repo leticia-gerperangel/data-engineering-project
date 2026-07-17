@@ -35,9 +35,9 @@ filtered as (
         and fare_amount  >= 0
         and total_amount >= 0
         and passenger_count > 0
-        and dropoff_datetime >= pickup_datetime
         and pickup_location_id  is not null
         and dropoff_location_id is not null
+        and timestamp_diff(dropoff_datetime, pickup_datetime, minute) between 1 and 1440
         and extract(year from pickup_datetime) between {{ var('start_year') }} and {{ var('end_year') }}
 )
  
