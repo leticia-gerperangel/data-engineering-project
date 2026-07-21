@@ -1,8 +1,10 @@
-# Data engineering project
+# NYC Taxi Data Engineering Pipeline
 
-A full end‑to‑end data pipeline that ingests NYC taxi trip data, stores it in Google Cloud Storage and BigQuery, transforms it with dbt, processes it at scale with Apache Spark and visualizes it in an interactive dashboard.
+End-to-end data pipeline processing 111M+ real NYC taxi trips: from raw ingestion
+to an interactive analytics dashboard, using Docker, PostgreSQL, Kestra, GCS,
+BigQuery, dbt and Apache Spark.
 
-Built following modules of the [Data Engineering Zoomcamp](https://github.com/DataTalksClub/data-engineering-zoomcamp) by DataTalksClub.
+Built following the [Data Engineering Zoomcamp](https://github.com/DataTalksClub/data-engineering-zoomcamp) by DataTalksClub.
 
 ---
 ## Architecture
@@ -39,7 +41,7 @@ Built following modules of the [Data Engineering Zoomcamp](https://github.com/Da
 │                   ANALYTICS LAYER  (dbt)                        │
 │              staging → intermediate → marts                     │
 │   dim_vendor · dim_zones · dim_payment_type · dim_rate_code     │
-│        fact_trips · mart_monthly_revenue · mart_zone_stats      │
+│        fact_trips · mart_month_revenue · mart_zones_stats       │
 └─────────────────────────────────────────────────────────────────┘
           │
           ▼
@@ -55,15 +57,15 @@ Built following modules of the [Data Engineering Zoomcamp](https://github.com/Da
 | Layer | Technology | Description |
 |---|---|---|
 | Containerization | Docker + Docker Compose | Runs PostgreSQL, pgAdmin and Kestra as isolated containers |
-| Local database | PostgreSQL 18 | Staging database for raw CSV ingestion before cloud upload |
+| Local database | PostgreSQL 18 | Staging database for raw CSV ingestion before uploading to the cloud |
 | Orchestration | Kestra | UI-driven workflow engine that automates and chains pipeline steps |
-| Cloud storage | Google Cloud Storage (GCS) | Data lake storing raw and processed Parquet files |
+| Cloud storage | Google Cloud Storage (GCS) | Data lake storing raw and processed files |
 | Data warehouse | BigQuery | Serverless analytical database with external and partitioned tables |
 | Analytics engineering | dbt (BigQuery adapter) | SQL-based transformation framework that builds the star schema |
 | Batch processing | Apache Spark 4.x + PySpark | Distributed processing engine for large-scale data standardization and aggregation |
 | Visualization | Looker Studio | Interactive dashboard connected directly to BigQuery marts |
 | Package manager | uv (Python) | Fast Python package and virtual environment manager |
-| Language | Python 3.13 | Used for ingestion scripts, orchestration tasks and Spark jobs |
+| Language | Python 3.13 | Ingestion scripts, orchestration tasks and Spark jobs |
  
 ---
 
@@ -126,7 +128,7 @@ Open the Kestra UI at `http://localhost:8080` and run the flows in order:
 | 4 | `08-gcp-taxi` | Extract CSV Data → Upload to GCS → BigQuery external + partitioned tables + MERGE |
 
 
-### Phase 3 — DW
+### Phase 3 — Data Warehouse
 
 The `08-gcp-taxi` Kestra flow handles the full BigQuery lifecycle automatically.
 For manual setup or ad-hoc queries against the raw data, use the scripts in `dw/`.
@@ -167,7 +169,7 @@ jupyter notebook # python -m jupyter notebook
 
 ### Phase 6 — Dashboard
  
-The dashboard is built with **Looker Studio** connected directly to the BigQuery marts. No data export needed — Looker Studio queries `mart_month_revenue` and `mart_zone_stats` in real time.
+The dashboard is built with **Looker Studio** connected directly to the BigQuery marts. No data export needed (Looker Studio queries `mart_month_revenue` and `mart_zones_stats` in real time).
 
 [View the NYC Taxi Analytics Dashboard →](https://datastudio.google.com/s/jHU9jI2t7bo)
 
@@ -198,9 +200,9 @@ WSL acts as an isolated Linux layer with its own Java installation, completely
 independent from the Windows host.
 
 
-## Data Source
+## Data source
  
-[NYC TLC Trip Record Data](https://github.com/DataTalksClub/nyc-tlc-data/releases) via DataTalksClub GitHub releases:
+[NY Taxi Record Data](https://github.com/DataTalksClub/nyc-tlc-data/releases) via DataTalksClub GitHub releases:
  
 - Yellow taxi: 2019–2020
 - Green taxi: 2019–2020
