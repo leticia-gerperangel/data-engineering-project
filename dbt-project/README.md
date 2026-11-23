@@ -1,4 +1,10 @@
-## Environment
+## dbt
+
+dbt (data build tool) is an open-source framework for transforming, testing, and documenting data in a data warehouse.
+
+In this project, dbt is used to transform raw data loaded into the data warehouse into clean, reliable, and analysis-ready data models.
+
+### Environment
 
 dbt is installed in an isolated `uv` virtual environment scoped to this folder, avoiding conflicts with other Python tools in the project.
 

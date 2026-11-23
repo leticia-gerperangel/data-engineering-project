@@ -1,154 +1,105 @@
-# NYC Taxi Data Engineering Pipeline
+# NYC Taxi Pipeline
 
-End-to-end data pipeline processing 111M+ real NYC taxi trips: from raw ingestion
-to an interactive analytics dashboard, using Docker, PostgreSQL, Kestra, GCS,
-BigQuery, dbt and Apache Spark.
+End-to-end NYC Taxi data pipeline from monthly CSV ingestion to an analytics dashboard. Kestra uploads CSVs to GCS and merges them into BigQuery tables; BigQuery external tables provide dbt’s sources, dbt builds the marts, and Looker Studio visualizes them. PostgreSQL and Spark are separate learning branches.
 
-Built following the [Data Engineering Zoomcamp](https://github.com/DataTalksClub/data-engineering-zoomcamp) by DataTalksClub.
+> Built following the [Data Engineering Zoomcamp](https://github.com/DataTalksClub/data-engineering-zoomcamp) by DataTalksClub.
 
----
+
 ## Architecture
- 
+
+```mermaid
+flowchart TB
+    src["NYC TLC TRIP DATA<br/>Yellow & Green taxi<br/>2019–2020"]
+
+    local["LOCAL INGESTION<br/>Python (uv) or Kestra flow 04<br/>PostgreSQL (Docker)"]
+    kestra["CLOUD INGESTION (Kestra)<br/>Flow 08<br/>One taxi type, year and month per run"]
+    lake["DATA LAKE (GCS)<br/>Monthly CSV files"]
+    spark["BATCH PROCESSING<br/>Apache Spark (WSL)<br/>PySpark + Spark SQL<br/>Local output, 2020 only"]
+
+    dw["BIGQUERY EXTERNAL TABLES<br/>external_yellow_tripdata<br/>external_green_tripdata<br/>Created by 01-external-tables.sql"]
+    dbt["ANALYTICS LAYER (dbt)<br/>staging → intermediate → marts<br/>Star schema: fact_trips + 4 dimensions<br/>mart_month_revenue · mart_zones_stats"]
+    dash["DASHBOARD (Looker Studio)<br/>Trips overview · Zones analysis"]
+
+    src -.-> local
+    src -.-> spark
+    src --> kestra -->|CSV upload| lake
+    lake -->|external table SQL| dw --> dbt --> dash
+
+    classDef secondary stroke-dasharray:6 4
+    class local,spark secondary
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        NYC TLC Trip Data                        │
-│              (Yellow & Green taxi, 2019–2020)                   │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     INGESTION LAYER                             │
-│         Docker · PostgreSQL · Python (uv) · Jupyter             │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────────────┐
-│                    ORCHESTRATION LAYER                         │
-│                     Kestra (Docker)                            │
-│           ingest → upload GCS → BigQuery tables                │
-└──────────┬──────────────────────────────────────┬──────────────┘
-           │                                      │
-           ▼                                      ▼
-┌─────────────────────┐              ┌────────────────────────────┐
-│   DATA WAREHOUSE    │              │     BATCH PROCESSING       │
-│  GCS  →  BigQuery   │              │  Apache Spark (WSL local)  │
-│  External tables    │              │  PySpark DataFrames        │
-│  Partitioned tables │              │  Spark SQL analytics       │
-└─────────┬───────────┘              └────────────────────────────┘
-          │
-          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   ANALYTICS LAYER  (dbt)                        │
-│              staging → intermediate → marts                     │
-│   dim_vendor · dim_zones · dim_payment_type · dim_rate_code     │
-│        fact_trips · mart_month_revenue · mart_zones_stats       │
-└─────────────────────────────────────────────────────────────────┘
-          │
-          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   DASHBOARD (Looker Studio)                     │
-│   Trip trends · Revenue analysis · Geographic distribution      │
-└─────────────────────────────────────────────────────────────────┘
-```
----
+
+The dashed branches do not feed the dashboard.
 
 ## Tech Stack
  
 | Layer | Technology | Description |
 |---|---|---|
 | Containerization | Docker + Docker Compose | Runs PostgreSQL, pgAdmin and Kestra as isolated containers |
-| Local database | PostgreSQL 18 | Staging database for raw CSV ingestion before uploading to the cloud |
-| Orchestration | Kestra | UI-driven workflow engine that automates and chains pipeline steps |
-| Cloud storage | Google Cloud Storage (GCS) | Data lake storing raw and processed files |
+| Local database | PostgreSQL 18 | Local target to practice containerized, chunked ingestion |
+| Orchestration | Kestra | UI-driven workflow engine that automates the loading steps |
+| Cloud storage | Google Cloud Storage (GCS) | Data lake storing raw data |
 | Data warehouse | BigQuery | Serverless analytical database with external and partitioned tables |
 | Analytics engineering | dbt (BigQuery adapter) | SQL-based transformation framework that builds the star schema |
-| Batch processing | Apache Spark 4.x + PySpark | Distributed processing engine for large-scale data standardization and aggregation |
+| Batch processing | Apache Spark 4.x + PySpark | Local batch-processing exercises in WSL |
 | Visualization | Looker Studio | Interactive dashboard connected directly to BigQuery marts |
 | Package manager | uv (Python) | Fast Python package and virtual environment manager |
-| Language | Python 3.13 | Ingestion scripts, orchestration tasks and Spark jobs |
+| Language | Python | Python for ingestion and for batch processing |
  
 ---
 
 ## Configuration
 
-Before running the pipeline, copy the environment template and fill in your values:
+Only `containers/.env.example` is committed. Use it as a reference for the required values, then provide them locally using your preferred setup. Keep local configuration and credentials out of Git.
+
+Set GCP values in the Kestra KV store and add the `GCP_SERVICE_ACCOUNT` secret. Use `nytaxi` for `GCP_DATASET` to match the SQL and dbt sources. dbt also needs a BigQuery profile and the `GCP_PROJECT_ID` environment variable.
+
+
+## Start the infrastructure
 
 ```bash
-cp containers/.env.example containers/.env
+cd containers
+docker compose up -d
 ```
 
-Edit `containers/.env` with your values.
-
-
-Place your GCP service account JSON file in `credentials/` (this folder is excluded from git via `.gitignore`).
-
-
-## Start the local infrastructure
-
-```bash
-cd containers/
-docker-compose up -d
-```
-
-This starts three services: PostgreSQL, pgAdmin (http://localhost:8085) and Kestra (http://localhost:8080).
+This starts PostgreSQL, pgAdmin (`http://localhost:8085`), Kestra (`http://localhost:8080`) and Kestra's internal PostgreSQL database.
 
 
 ## Running the pipeline
 
-### Phase 1 — Ingest raw data into PostgreSQL
 
-Ingest NYC taxi data into PostgreSQL. Two options:
+### Orchestrate with Kestra
 
-**Option A — Run locally with uv:**
-```bash
-cd ingestion/
-uv sync --dev
-uv run python ingest_data.py --taxi-type yellow --year 2019 --month 1
-uv run python ingest_data.py --taxi-type green --target-table green_taxi_trips --year 2019 --month 1
-```
-
-**Option B — Run containerized with Docker:**
-```bash
-cd ingestion/
-docker build -t taxi_ingest:v001 .
-docker run -it --rm --network=containers_default --env-file ..\containers\.env_postgres_docker taxi_ingest:v001 --taxi-type green --target-table green_taxi_trips --year 2019 --month 1
-```
-Verify the data was loaded correctly by opening pgAdmin at `http://localhost:8085`
-
-
-### Phase 2 — Orchestrate with Kestra
-
-Open the Kestra UI at `http://localhost:8080` and run the flows in order:
+Open Kestra at `http://localhost:8080` and run:
 
 | Step | Flow | Purpose |
 |---|---|---|
-| 1 | `06-gcp-kv-example` | Register GCP values in the Kestra KV store. Run manually from the UI. |
-| 2 | `07-gcp-setup` | Create the GCS bucket and BigQuery dataset |
-| 3 | `04-postgres-taxi` | Download CSV → PostgreSQL via staging + MERGE (idempotent) |
-| 4 | `08-gcp-taxi` | Extract CSV Data → Upload to GCS → BigQuery external + partitioned tables + MERGE |
+| 1 | `06_gcp_kv` | Set GCP values; change `GCP_DATASET` to `nytaxi` in [`06-gcp-kv.yaml`](orchestration/06-gcp-kv.yaml) to match dbt. |
+| 2 | `07_gcp_setup` | Create the GCS bucket and BigQuery dataset. |
+| 3 | `08_gcp_taxi` | Load one taxi type, year and month. Repeat for each file needed. |
+
+The last flow uploads a CSV to GCS and merges its rows into the permanent `yellow_tripdata` or `green_tripdata` BigQuery table.
 
 
-### Phase 3 — Data Warehouse
+### Data Warehouse
 
-The `08-gcp-taxi` Kestra flow handles the full BigQuery lifecycle automatically.
-For manual setup or ad-hoc queries against the raw data, use the scripts in `dw/`.
+dbt reads the external tables created from CSV files in GCS, not Kestra's permanent `yellow_tripdata` and `green_tripdata` tables. Run `dw/01-external-tables.sql` in the [BigQuery console](https://console.cloud.google.com/bigquery) once the files are in GCS.
 
-- `01-external-tables.sql` Create external tables over CSV files in GCS.
-- `02-partitioned-tables.sql` Create production tables partitioned by pickup date.
-- `03-partition-clustering.sql` Demonstrate the performance impact of partitioning and clustering.
-- `04-data-quality-check.sql` Validate data quality before dbt transformations.
+The SQL expects the `nytaxi` dataset and CSV files in `data-engineering-demo/yellow` and `data-engineering-demo/green` for 2019–2020. Update the SQL paths if your bucket differs. The external tables reference data in GCS; they do not copy it into BigQuery.
 
-Run them directly in the [BigQuery console](https://console.cloud.google.com/bigquery).
+The other `dw/` scripts demonstrate partitioning, clustering and data-quality checks.
 
 
-### Phase 4 — Transform with dbt
+### Transform with dbt
 
-The dbt project is installed in an isolated `uv` virtual environment. All commands use `uv run dbt` to ensure the correct version is always used.
+dbt uses `external_yellow_tripdata` and `external_green_tripdata` as sources. Set `GCP_PROJECT_ID` and configure the BigQuery profile before running dbt.
+
+From the repository root:
 
 ```bash
-cd dbt-project/
+cd dbt-project
 uv sync
-cd dbt-project/taxi_rides_ny/
+cd taxi_rides_ny
 uv run dbt deps
 uv run dbt debug
 uv run dbt seed
@@ -156,49 +107,28 @@ uv run dbt run
 uv run dbt test
 ```
 
-### Phase 5 — Batch processing with Spark
 
-Spark runs locally in WSL and processes data from local files. The GCS connector is not configured in this project — at this scale, dbt on BigQuery handles all production transformations more efficiently. The Spark notebooks serve as a demonstration of distributed processing skills and would be the natural extension point for larger datasets.
-
-```bash
-# Open a WSL terminal and navigate to the batch folder
-cd batch/
-jupyter notebook # python -m jupyter notebook
-```
-
-
-### Phase 6 — Dashboard
+### Dashboard
  
 The dashboard is built with **Looker Studio** connected directly to the BigQuery marts. No data export needed (Looker Studio queries `mart_month_revenue` and `mart_zones_stats` in real time).
 
 [View the NYC Taxi Analytics Dashboard →](https://datastudio.google.com/s/jHU9jI2t7bo)
 
+---
 
 ## Lessons learned
 
-**Docker port conflicts are real.**
-This was my first time working with Docker in a data engineering context.
-PostgreSQL's default port (5432) was unavailable for two reasons: a local
-PostgreSQL instance already running on the host, and a second PostgreSQL
-container used internally by Kestra occupying the same port within the Docker
-network. The fix was mapping `pgdatabase` to port 5433 on the host
-(`5433:5432` in `docker-compose.yml`), which also taught me that
-multi-container setups require careful port planning from the start.
+**Resolving a Docker port conflict.**
+The host's port 5432 was already used by local PostgreSQL, so the project database maps host port 5433 to container port 5432 (`5433:5432`).  This allows both databases to run at the same time.
 
-**Isolated environments prevent dependency hell.**
-I set up the dbt project inside a `uv` virtual environment scoped to the
-`dbt-project/` folder rather than installing dbt globally. This keeps the
-dbt version and its dependencies completely isolated from the rest of the
-project. Every dbt command runs as `uv run dbt ...`, which makes the setup
-fully reproducible on any machine without version conflicts.
+**Keeping dbt dependencies separate.**
+I used `uv` to run dbt in the project's virtual environment instead of installing it globally. This keeps dbt's dependencies separate from other project tools.
 
+**Running Spark with a compatible Java version.**
+Spark 4.x requires Java 17, but my local machine runs a different Java version needed by other projects.
+Installing Spark inside WSL solved the conflict cleanly — WSL acts as an isolated Linux layer with its own Java installation, completely independent from the Windows host.
 
-**WSL as a sandbox for incompatible runtimes.**
-Spark 4.x requires Java 17, but my local machine runs a different Java version
-needed by other projects. Installing Spark inside WSL solved the conflict cleanly —
-WSL acts as an isolated Linux layer with its own Java installation, completely
-independent from the Windows host.
-
+---
 
 ## Data source
  

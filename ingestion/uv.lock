@@ -379,6 +379,7 @@ name = "data-engineering-project"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "click" },
     { name = "google-cloud-storage" },
     { name = "pandas" },
     { name = "psycopg", extra = ["binary", "pool"] },
@@ -396,6 +397,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.1.7" },
     { name = "google-cloud-storage", specifier = ">=3.8.0" },
     { name = "pandas", specifier = ">=3.0.1" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.3" },

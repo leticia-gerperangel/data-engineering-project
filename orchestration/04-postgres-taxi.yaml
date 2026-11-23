@@ -1,7 +1,7 @@
 id: 04_postgres_taxi
 namespace: zoomcamp
 description: |
-  Download NYC TLC Data from https://github.com/DataTalksClub/nyc-tlc-data/releases and load it into a PostgreSQL database.
+  The flow extracts CSV data (https://github.com/DataTalksClub/nyc-tlc-data/releases) partitioned by year and month, creates tables, loads data to the monthly table, and finally merges the data to the final destination table in PostgreSQL.
 
 inputs:
   - id: taxi

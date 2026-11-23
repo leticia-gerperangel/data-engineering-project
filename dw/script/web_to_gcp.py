@@ -12,14 +12,14 @@ import pandas as pd
 from google.cloud import storage
 from dotenv import load_dotenv
 
-from ingestion.schemas import DTYPES, PARSE_DATES
+from ingestion.schemas import DTYPES
 
 """
-Dowloads NYC TLC data from GitHub, converts it to Parquet, and uploads to Google Cloud Storage.
+Downloads NYC TLC data from GitHub, converts it to Parquet, and uploads to Google Cloud Storage.
 For CSV files, it downloads the .csv.gz, converts to Parquet, and uploads both (if --upload-csv).
-Enviroment variables (via .env or system):
+Environment variables (via .env or system):
     - GCP_GCS_BUCKET: name of the target GCS bucket
-    - GCP_APPLICATION_CREDENTIALS: path to GCP service account JSON key file
+    - GOOGLE_APPLICATION_CREDENTIALS: path to GCP service account JSON key file
 """
 
 # Configure logging
@@ -29,21 +29,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def build_url(service: str, year: int, month: int) -> tuple[str, str]:
+def build_url(service: str, year: int, month: int) -> str:
     BASE_URL = "https://github.com/DataTalksClub/nyc-tlc-data/releases/download/"
-    url = f"{BASE_URL}{service}/{service}_tripdata_{year}-{month:02d}.csv.gz"
-    return url, "csv"
+    return f"{BASE_URL}{service}/{service}_tripdata_{year}-{month:02d}.csv.gz"
 
 def load_env_vars():
     """Load environment variables from .env file if it exists, otherwise rely on system environment variables."""
     current = Path(__file__).resolve().parent
+    env_loaded = False
     for candidate in [current, *current.parents]:
-        env_file = candidate / ".env_encoded"
-        if env_file.exists():
-            load_dotenv(env_file)
-            logger.info(f".env loaded from: {env_file}")
-            return
-    logger.warning("Not found .env — using system environment variables")
+        for env_file in (candidate / ".env_encoded", candidate / "containers" / ".env_encoded"):
+            if env_file.exists():
+                load_dotenv(env_file)
+                logger.info(f"Environment loaded from: {env_file}")
+                env_loaded = True
+                break
+        if env_loaded:
+            break
+    if not env_loaded:
+        logger.warning("Not found .env — using system environment variables")
+    if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+        credentials_path = os.getenv("GCP_APPLICATION_CREDENTIALS")
+        if credentials_path:
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
 
 
 def clean_local_files(*file_paths):
@@ -57,44 +65,50 @@ def clean_local_files(*file_paths):
             logger.error(f"Failed to delete {file_path}: {e}")
 
 def download_file(url: str, dest: Path, timeout: int = 60) -> bool:
-    """Download a file from a URL with error handling."""
+    """Download a file, returning False only when the source returns HTTP 404."""
     logger.info(f"Downloading: {url}")
     try:
-        response = requests.get(url, timeout=timeout, stream=True)
-        if response.status_code == 404:
-            logger.warning(f"File not found (404): {url}")
-            return False
-        response.raise_for_status()
-        with open(dest, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+        with requests.get(url, timeout=timeout, stream=True) as response:
+            if response.status_code == 404:
+                logger.warning(f"File not found (404): {url}")
+                return False
+            response.raise_for_status()
+            with open(dest, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
         logger.info(f"Downloaded: {dest.name} ({dest.stat().st_size / 1_048_576:.1f} MB)")
         return True
     except requests.exceptions.RequestException as exc:
         logger.error(f"Error downloading: {exc}")
-        return False
+        raise
 
 def csv_gz_to_parquet(csv_gz_path: Path, service: str) -> Path:
     """Decompress a .csv.gz file to .csv, convert it to Parquet, and return the Parquet file path."""
 
     csv_path = csv_gz_path.with_suffix("")  # remove .gz extension for the intermediate CSV file
- 
-    logger.info(f"Decompressing: {csv_gz_path.name}")
-    with gzip.open(csv_gz_path, "rb") as f_in, open(csv_path, "wb") as f_out:
-        shutil.copyfileobj(f_in, f_out)
- 
-    logger.info(f"Converting to Parquet: {csv_path.name}")
-    df = pd.read_csv(
-        csv_path,
-        dtype=DTYPES[service],
-        parse_dates=PARSE_DATES[service],
-    )
     parquet_path = csv_path.with_suffix(".parquet")
-    df.to_parquet(parquet_path, engine="pyarrow", index=False)
-    logger.info(f"Parquet generated: {parquet_path.name} ({len(df):,} rows)")
  
-    csv_path.unlink()  # remove intermediate CSV file
-    return parquet_path
+    try:
+        logger.info(f"Decompressing: {csv_gz_path.name}")
+        with gzip.open(csv_gz_path, "rb") as f_in, open(csv_path, "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
+
+        logger.info(f"Converting to Parquet: {csv_path.name}")
+        schema = DTYPES[service]
+        df = pd.read_csv(
+            csv_path,
+            dtype=schema["dtype"],
+            parse_dates=schema["parse_dates"],
+        )
+        df.to_parquet(parquet_path, engine="pyarrow", index=False)
+        logger.info(f"Parquet generated: {parquet_path.name} ({len(df):,} rows)")
+        return parquet_path
+    except Exception:
+        parquet_path.unlink(missing_ok=True)
+        raise
+    finally:
+        csv_path.unlink(missing_ok=True)
 
 
 def upload_to_gcs(bucket: str, object_name: str, local_file: str) -> None:
@@ -120,35 +134,50 @@ def process_month(
     tmp_dir: Path,
 ) -> bool:
     """
-    Process a specific month:
-      - CSV: download .csv.gz, convert to Parquet, upload Parquet (and CSV if --upload-csv)
-      - Parquet: download and upload directly
-    Returns True if successful.
+    Download one month's CSV archive, convert it to Parquet, and upload the output.
+    Optionally upload the original compressed CSV archive as well.
+    Returns False only when the source file returns HTTP 404.
     """
-    url, fmt = build_url(service, year, month)
+    if not 1 <= month <= 12:
+        raise ValueError(f"Month must be between 1 and 12; got {month}.")
+
+    url = build_url(service, year, month)
     month_str = f"{month:02d}"
     filename = f"{service}_tripdata_{year}-{month_str}"
  
-    if fmt == "csv":
-        local_file = tmp_dir / f"{filename}.csv.gz"
-        ok = download_file(url, local_file)
-        if not ok:
+    local_file = tmp_dir / f"{filename}.csv.gz"
+    parquet_path = tmp_dir / f"{filename}.parquet"
+    try:
+        if not download_file(url, local_file):
             return False
- 
-        try:
-            # Upload CSV if requested
-            if upload_csv:
-                upload_to_gcs(bucket, f"{service}/csv/{filename}.csv.gz", local_file)
- 
-            # Convert and upload Parquet
-            parquet_path = csv_gz_to_parquet(local_file, service)
-            upload_to_gcs(bucket, f"{service}/{filename}.parquet", parquet_path)
-            parquet_path.unlink()
-        finally:
-            if local_file.exists():
-                local_file.unlink()
- 
-    return True
+
+        parquet_path = csv_gz_to_parquet(local_file, service)
+        if upload_csv:
+            upload_to_gcs(bucket, f"{service}/csv/{filename}.csv.gz", local_file)
+        upload_to_gcs(bucket, f"{service}/{filename}.parquet", parquet_path)
+        return True
+    finally:
+        local_file.unlink(missing_ok=True)
+        parquet_path.unlink(missing_ok=True)
+
+
+def parse_months(months: tuple[str, ...]) -> range | list[int]:
+    if not months or months == ("all",):
+        return range(1, 13)
+
+    try:
+        month_list = [int(month) for value in months for month in value.split()]
+    except ValueError as exc:
+        raise click.BadParameter(
+            'Use "all" or month numbers from 1 to 12.', param_hint="--months"
+        ) from exc
+
+    if not month_list or any(month < 1 or month > 12 for month in month_list):
+        raise click.BadParameter(
+            'Month numbers must be between 1 and 12.', param_hint="--months"
+        )
+
+    return month_list
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
  
@@ -156,9 +185,9 @@ def process_month(
 @click.option(
     "--service", required=True, type=click.Choice(["yellow", "green"]), help="Type NYC TLC service",
 )
-@click.option("--year", required=True, type=int, help="Year of data to process")
+@click.option("--year", required=True, type=click.IntRange(min=1), help="Year of data to process")
 @click.option(
-    "--months", default="all", help='Months to process: "all" or space-separated list: 1 2 3', multiple=True,
+    "--months", default=["all"], help='Months to process: "all" or space-separated list: 1 2 3', multiple=True,
 )
 @click.option(
     "--bucket", default=None, envvar="GCP_GCS_BUCKET", help="Name of the GCS bucket (or environment variable GCP_GCS_BUCKET)",
@@ -176,11 +205,7 @@ def main(service, year, months, bucket, upload_csv):
         logger.error("GCS bucket name must be provided via --bucket or GCP_GCS_BUCKET environment variable")
         sys.exit(1)
 
-    if not months or months == ("all",) or list(months) == ["all"]:
-        month_list = range(1, 13)
-    else:
-        # Parse space-separated month list from command line
-        month_list = [int(m) for tocken in months for m in tocken.split()]
+    month_list = parse_months(months)
 
     logger.info(f"Service: {service} | Year: {year} | Months: {month_list}")
     logger.info(f"Bucket  : gs://{bucket}/{service}/")
